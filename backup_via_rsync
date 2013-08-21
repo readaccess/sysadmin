@@ -1,0 +1,96 @@
+#!/bin/sh
+##
+## backup_via_rsync
+##
+## Used in FreeBSD
+
+#--------------------
+# Set up variables
+#--------------------
+
+FILE_SYSTEMS_TO_BACKUP="/home / /usr /usr/local"
+
+FULL_DATETIME=`/bin/date '+%Y-%m-%d_%H%M'`
+FULL_TIME=`/bin/date '+%Y-%m-%d %H:%M:%S'`
+LOG_DIR=/home/var/dump
+LOG_FILE=${LOG_DIR}/${FULL_DATETIME}.log
+LOCK_FILE=${LOG_DIR}/lock
+
+REMOTE_DIR=/dump/current
+INCREMENTAL_DIR=/dump/${FULL_DATETIME}
+
+#--------------------
+# create log dir if not there already
+#--------------------
+
+/bin/mkdir -p ${LOG_DIR}
+
+
+#--------------------
+# mount /dump (should already be in /etc/fstab)
+#--------------------
+
+/sbin/mount /dump || exit 1
+
+/bin/df >> ${LOG_FILE}
+
+#--------------------
+# create REMOTE_DIR on REMOTE_HOST in case does not exist
+#--------------------
+
+/bin/mkdir -p ${REMOTE_DIR}
+
+#--------------------
+# Start log
+#--------------------
+
+echo "----------" >> ${LOG_FILE}
+echo "START" >> ${LOG_FILE}
+echo `/bin/date` >> ${LOG_FILE}
+
+#--------------------
+# loops thru FILE_SYSTEMS_TO_BACKUP and start backing up
+#--------------------
+
+for BACKUP_DIR in ${FILE_SYSTEMS_TO_BACKUP}
+do
+    echo "${FULL_TIME} RUNNING BACKUP ON ${BACKUP_DIR}" >> ${LOG_FILE}
+
+    /usr/local/bin/rsync \
+        --log-file=$LOG_FILE \
+        --force \
+        --archive \
+        --relative \
+        --one-file-system \
+        --ignore-errors \
+        --delete-excluded \
+        --delete \
+        --backup \
+        --backup-dir=$INCREMENTAL_DIR \
+        --exclude '*/swap0' \
+        ${BACKUP_DIR} \
+        ${REMOTE_DIR}
+done
+
+#--------------------
+# Clean up
+#--------------------
+
+echo "Done" >> ${LOG_FILE}
+echo `/bin/date` >> ${LOG_FILE}
+echo "----------" >> ${LOG_FILE}
+
+
+#--------------------
+# umount
+#--------------------
+
+/sbin/umount /dump
+
+
+#--------------------
+# spin down usb drive
+#--------------------
+# if using WD green drives that power down automatically, comment this out
+#echo -n "spinning down drive..."
+#/sbin/camcontrol stop 0:0:0 -v >> ${LOG_FILE}
