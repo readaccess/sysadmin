@@ -14,7 +14,8 @@ FULL_DATETIME=`/bin/date '+%Y-%m-%d_%H%M'`
 FULL_TIME=`/bin/date '+%Y-%m-%d %H:%M:%S'`
 LOG_DIR=/home/var/dump
 LOG_FILE=${LOG_DIR}/${FULL_DATETIME}.log
-LOCK_FILE=${LOG_DIR}/lock
+LOCK_FILE=${LOG_DIR}/backup_lock
+ALERT_EMAIL='sysadmin@domain.com'
 
 REMOTE_DIR=/dump/current
 INCREMENTAL_DIR=/dump/${FULL_DATETIME}
@@ -24,6 +25,30 @@ INCREMENTAL_DIR=/dump/${FULL_DATETIME}
 #--------------------
 
 /bin/mkdir -p ${LOG_DIR}
+
+
+#--------------------
+# check for lock file and if backup already running
+#--------------------
+
+if [ -e ${LOCK_FILE} ]
+then
+    echo "${FULL_TIME} Lock file exists - ${LOCK_FILE}" >> ${LOG_FILE}
+    OLD_PID=`/bin/cat ${LOCK_FILE}`
+    PS_PID=`/bin/ps -o pid -p ${OLD_PID} | /usr/bin/grep -v PID`
+    if [ $PS_PID ]
+    then
+        echo "${FULL_TIME} backup already running - $PS_PID - exiting" >> ${LOG_FILE}
+        # Uncomment if you wish to have an email sent to ALERT_EMAIL
+        #/usr/bin/mail -s "[BACKUP-ERROR] existing backup running" ${ALERT_EMAIL} < ${LOG_FILE}
+        exit 1
+    else
+        echo "${FULL_TIME} Lock file does not contain active pid (${OLD_PID}) - continuing" >> ${LOG_FILE}
+    fi
+else
+    echo "${FULL_TIME} creating lock file" >> ${LOG_FILE}
+    echo "$$" > ${LOCK_FILE}
+fi
 
 
 #--------------------
