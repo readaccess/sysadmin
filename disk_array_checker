@@ -1,0 +1,62 @@
+#!/usr/local/bin/perl
+##
+## disk_array_checker - Will check gmirror disk array
+##
+
+# USAGE:
+#  Should run in cron
+
+#--------------------
+# clean
+#--------------------
+
+$| = 1;
+
+
+#--------------------
+# modules and subroutines
+#--------------------
+
+use strict;
+use File::Basename;
+
+
+#--------------------
+# variables
+#--------------------
+
+my $program_name = basename($0);
+
+my $raid_command = "/sbin/gmirror";
+my $raid_command_args = "status -s";
+my $command_output;
+my $device_status;
+my @array_of_devices;
+my $alert_email = 'root@localhost';
+
+
+#--------------------
+# run command
+#--------------------
+
+$command_output = `$raid_command $raid_command_args`;
+
+@array_of_devices = split(/\n/,$command_output);
+
+# walk thru each disk making sure each is COMPLETE
+foreach $device_status (@array_of_devices)
+{
+  if ($device_status !~ /COMPLETE/)
+  {
+    `/usr/bin/logger -p local3.err -t "${program_name}[$$]" "RAID ERROR: ${device_status}"`;
+    `echo "${device_status}" | /usr/bin/mail -s "RAID ERROR" ${alert_email}`;
+    last;
+  }
+  else
+  {
+    `/usr/bin/logger -p local3.info -t "${program_name}[$$]" "RAID OK"`;
+  }
+
+  sleep(1);
+}
+exit;
